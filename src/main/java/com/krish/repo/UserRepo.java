@@ -1,5 +1,5 @@
 package com.krish.repo;
 
-public interface UserRepo {
+public interface UserRepo extends JpaRepository<User,Integer>{
 
 }
