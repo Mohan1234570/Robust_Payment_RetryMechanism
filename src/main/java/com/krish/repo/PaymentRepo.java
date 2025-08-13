@@ -1,12 +1,9 @@
 package com.krish.repo;
 
+import com.krish.entity.Payment;
+import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-
-import com.krish.entity.Payment;
-
-public interface PaymentRepo extends JpaRepository<Payment, Integer>{
-
-	Optional<Payment> findByTransactionId(String transactionId);
+public interface PaymentRepo extends JpaRepository<Payment, String> {
+	Optional<Payment> findByOrderId(String orderId);
 }

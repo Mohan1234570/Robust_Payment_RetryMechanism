@@ -1,9 +1,11 @@
 package com.krish.restcontroller;
 
-package com.payment.controller;
 
 import java.util.List;
 
+import com.krish.dto.PaymentRequest;
+import com.krish.dto.PaymentResponse;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.neo4j.Neo4jProperties.Authentication;
 import org.springframework.http.HttpStatus;
@@ -21,26 +23,15 @@ import com.krish.service.PaymentService;
 @RequestMapping("/api/payments")
 public class PaymentController {
 
-    @Autowired
-    private PaymentService paymentService;
+    private final PaymentService paymentService;
 
-   
-    @PostMapping
-    public ResponseEntity<Payment> processPayment(@RequestBody Payment payment, Authentication authentication) {
-        try {
-            String username = authentication.getUsername();
-            payment = paymentService.processPaymentForUser(payment, username);
-            return new ResponseEntity<>(payment, HttpStatus.CREATED);
-        } catch (Exception e) {
-            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
-        }
+    public PaymentController(PaymentService paymentService) {
+        this.paymentService = paymentService;
     }
 
-   
-    @GetMapping("/history")
-    public ResponseEntity<List<Payment>> getPaymentHistory(Authentication authentication) {
-        String username = authentication.getUsername();
-        List<Payment> paymentHistory = paymentService.getPaymentHistory(username);
-        return new ResponseEntity<>(paymentHistory, HttpStatus.OK);
+    @PostMapping
+    public PaymentResponse createPayment(@Valid @RequestBody PaymentRequest request) {
+        return paymentService.createPayment(request);
     }
 }
+

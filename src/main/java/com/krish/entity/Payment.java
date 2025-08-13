@@ -1,21 +1,32 @@
 package com.krish.entity;
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import lombok.Data;
+import java.time.Instant;
 
+@Setter
+@Getter
 @Entity
-@Data
+@Table(name = "payments")
 public class Payment {
 
-	    @Id
-	    @GeneratedValue(strategy = GenerationType.IDENTITY)
-	    private Long id;
-	    private String status;
-	    private String transactionId;
-	    private Double amount;
-	    
-	    
+	@Id
+	@GeneratedValue(strategy = GenerationType.UUID)
+	private String paymentId;
+
+	private String orderId;
+	private Long amount;
+	private String currency;
+	private String paymentMethod;
+	private String customerEmail;
+	private String status; // CREATED, PROCESSING, SUCCESS, FAILED
+	private String gateway;
+
+	// 🔹 This will store the Stripe/Razorpay session or order ID
+	private String gatewayPaymentId;
+
+	private Instant createdAt = Instant.now();
+
+	// getters and setters
 }
