@@ -26,7 +26,16 @@ public class Payment {
 	// 🔹 This will store the Stripe/Razorpay session or order ID
 	private String gatewayPaymentId;
 
+	private Integer retryCount = 0;
+	private Instant lastRetryAt;
+	private Instant nextRetryAt;
+
 	private Instant createdAt = Instant.now();
+
+	// helpers
+	public boolean isTerminal() {
+		return "SUCCESS".equals(status) || "FAILED".equals(status);
+	}
 
 	// getters and setters
 }
