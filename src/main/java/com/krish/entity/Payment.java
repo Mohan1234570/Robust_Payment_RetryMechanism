@@ -37,5 +37,8 @@ public class Payment {
 		return "SUCCESS".equals(status) || "FAILED".equals(status);
 	}
 
+	public void setCheckoutUrl(String url) {
+	}
+
 	// getters and setters
 }

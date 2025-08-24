@@ -15,33 +15,34 @@ public class RabbitConfig {
     public static final String RETRY_DELAY_ROUTING = "payment.retry.delay";
 
     @Bean
-    public DirectExchange paymentExchange() {
-        return new DirectExchange(EXCHANGE);
+    public DirectExchange retryExchange() {
+        return new DirectExchange("payment.retry.exchange");
     }
 
     @Bean
-    public Queue retryQueue() {
-        return QueueBuilder.durable(RETRY_QUEUE).build();
-    }
-
-    @Bean
-    public Queue retryDelayQueue() {
-        // messages published here expire and dead-letter to RETRY_QUEUE
-        return QueueBuilder.durable(RETRY_DELAY_QUEUE)
-                .withArguments(Map.of(
-                        "x-dead-letter-exchange", EXCHANGE,
-                        "x-dead-letter-routing-key", RETRY_ROUTING
-                ))
+    public Queue delayQueue() {
+        return QueueBuilder.durable("payment.retry.delay")
+                .withArgument("x-dead-letter-exchange", "payment.retry.exchange")
+                .withArgument("x-dead-letter-routing-key", "retry")
                 .build();
     }
 
     @Bean
-    public Binding retryBinding() {
-        return BindingBuilder.bind(retryQueue()).to(paymentExchange()).with(RETRY_ROUTING);
+    public Queue retryQueue() {
+        return QueueBuilder.durable("payment.retry.main").build();
     }
 
     @Bean
-    public Binding retryDelayBinding() {
-        return BindingBuilder.bind(retryDelayQueue()).to(paymentExchange()).with(RETRY_DELAY_ROUTING);
+    public Binding delayBinding(Queue delayQueue, DirectExchange retryExchange) {
+        return BindingBuilder.bind(delayQueue)
+                .to(retryExchange)
+                .with("delay");
+    }
+
+    @Bean
+    public Binding retryBinding(Queue retryQueue, DirectExchange retryExchange) {
+        return BindingBuilder.bind(retryQueue)
+                .to(retryExchange)
+                .with("retry");
     }
 }
