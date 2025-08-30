@@ -9,6 +9,8 @@ import com.stripe.exception.SignatureVerificationException;
 import com.stripe.model.Event;
 import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,8 @@ import java.time.Instant;
 @RestController
 @RequestMapping("/api/webhooks")
 public class StripeWebhookController {
+
+    private static final Logger log = LoggerFactory.getLogger(StripeWebhookController.class);
 
     private final PaymentRepo paymentRepo;
     private final PaymentRetryProducer retryProducer;
@@ -47,36 +51,48 @@ public class StripeWebhookController {
         try {
             event = Webhook.constructEvent(payload, sigHeader, webhookSecret);
         } catch (SignatureVerificationException e) {
+            log.error("❌ Invalid Stripe signature: {}", e.getMessage());
             return ResponseEntity.badRequest().body("Invalid signature");
         }
 
-        // We only need a couple of types for core flow:
+        log.info("✅ Received Stripe event: {}", event.getType());
+
         switch (event.getType()) {
             case "checkout.session.completed" -> {
                 Session session = (Session) event.getDataObjectDeserializer()
                         .getObject().orElse(null);
                 if (session == null) break;
 
-                paymentRepo.findByGatewayPaymentId(session.getId()).ifPresent(payment -> {
+                log.info("🎉 Checkout completed for session: {}", session.getId());
+
+                paymentRepo.findByGatewayPaymentId(session.getId()).ifPresentOrElse(payment -> {
                     if (!payment.isTerminal()) {
                         payment.setStatus("SUCCESS");
                         payment.setLastRetryAt(Instant.now());
                         paymentRepo.save(payment);
+                        log.info("✅ Payment {} marked as SUCCESS", payment.getPaymentId());
+                    } else {
+                        log.info("ℹ️ Payment {} is already terminal, skipping", payment.getPaymentId());
                     }
-                });
+                }, () -> log.warn("⚠️ No payment found for session {}", session.getId()));
             }
 
             case "checkout.session.expired" -> {
-                // Treat as failure; schedule retry to create a new session
                 Session session = (Session) event.getDataObjectDeserializer()
                         .getObject().orElse(null);
                 if (session == null) break;
 
-                paymentRepo.findByGatewayPaymentId(session.getId()).ifPresent(payment -> {
-                    if (payment.isTerminal()) return;
+                log.warn("⌛ Checkout expired for session: {}", session.getId());
+
+                paymentRepo.findByGatewayPaymentId(session.getId()).ifPresentOrElse(payment -> {
+                    if (payment.isTerminal()) {
+                        log.info("ℹ️ Payment {} already terminal, skipping retry", payment.getPaymentId());
+                        return;
+                    }
                     payment.setStatus("RETRYING");
                     payment.setRetryCount(payment.getRetryCount() + 1);
                     payment.setLastRetryAt(Instant.now());
+
                     long delay = computeBackoffMillis(payment.getRetryCount());
                     payment.setNextRetryAt(Instant.now().plusMillis(delay));
                     paymentRepo.save(payment);
@@ -85,18 +101,19 @@ public class StripeWebhookController {
                             new PaymentRetryMessage(payment.getPaymentId(), payment.getRetryCount()),
                             delay
                     );
-                });
+
+                    log.info("🔁 Payment {} scheduled for retry #{} after {} ms",
+                            payment.getPaymentId(), payment.getRetryCount(), delay);
+                }, () -> log.warn("⚠️ No payment found for expired session {}", session.getId()));
             }
 
-            // Optional: handle payment_intent.payment_failed if you use PaymentIntents directly
-            default -> {} // ignore others for now
+            default -> log.debug("ℹ️ Ignored Stripe event: {}", event.getType());
         }
 
         return ResponseEntity.ok("ok");
     }
 
     private long computeBackoffMillis(int attempt) {
-        // 1: 30s, 2: 2m, 3: 10m, 4: 1h, 5+: 6h
         return switch (attempt) {
             case 1 -> Duration.ofSeconds(30).toMillis();
             case 2 -> Duration.ofMinutes(2).toMillis();
