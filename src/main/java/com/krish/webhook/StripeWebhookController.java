@@ -1,7 +1,6 @@
 package com.krish.webhook;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.krish.entity.Payment;
 import com.krish.repo.PaymentRepo;
 import com.krish.utils.PaymentRetryMessage;
 import com.krish.utils.PaymentRetryProducer;
